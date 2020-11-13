@@ -1,7 +1,7 @@
 /**
  * External dependencies
  */
-import { get, find, camelCase, isString } from 'lodash';
+import { get, find, camelCase, kebabCase, isString } from 'lodash';
 /**
  * WordPress dependencies
  */
@@ -34,6 +34,13 @@ export const PRESET_CLASSES = {
 		property: 'font-size',
 	},
 };
+
+const STYLE_PROPERTIES_TO_PRESETS = {
+	backgroundColor: 'color',
+	LINK_COLOR: 'color',
+	background: 'gradient',
+};
+
 export const LINK_COLOR = '--wp--style--color--link';
 export const LINK_COLOR_DECLARATION = `a { color: var(${ LINK_COLOR }, #00e); }`;
 
@@ -53,33 +60,42 @@ export function useEditorFeature( featurePath, blockName = GLOBAL_CONTEXT ) {
 	);
 }
 
-export function getPresetVariable( presetCategory, presets, value ) {
+export function getPresetVariable( styles, blockName, propertyName, value ) {
 	if ( ! value ) {
 		return;
 	}
+	const presetCategory =
+		STYLE_PROPERTIES_TO_PRESETS[ propertyName ] || propertyName;
+	if ( ! presetCategory ) {
+		return;
+	}
 	const presetData = PRESET_CATEGORIES[ presetCategory ];
-	const { key } = presetData;
+	if ( ! presetData ) {
+		return;
+	}
+	const { key, path } = presetData;
+	const presets =
+		get( styles, [ blockName, 'settings', ...path ] ) ??
+		get( styles, [ GLOBAL_CONTEXT, 'settings', ...path ] );
 	const presetObject = find( presets, ( preset ) => {
 		return preset[ key ] === value;
 	} );
-	return (
-		presetObject && `var:preset|${ presetCategory }|${ presetObject.slug }`
-	);
+	if ( presetObject ) {
+		return `var:preset|${ kebabCase( presetCategory ) }|${
+			presetObject.slug
+		}`;
+	}
 }
 
-function getValueFromPresetVariable(
-	features,
-	blockName,
-	[ presetType, slug ]
-) {
+function getValueFromPresetVariable( styles, blockName, [ presetType, slug ] ) {
 	presetType = camelCase( presetType );
 	const presetData = PRESET_CATEGORIES[ presetType ];
 	if ( ! presetData ) {
 		return;
 	}
 	const presets =
-		get( features, [ blockName, ...presetData.path ] ) ??
-		get( features, [ GLOBAL_CONTEXT, ...presetData.path ] );
+		get( styles, [ blockName, 'settings', ...presetData.path ] ) ??
+		get( styles, [ GLOBAL_CONTEXT, 'settings', ...presetData.path ] );
 	if ( ! presets ) {
 		return;
 	}
@@ -89,19 +105,19 @@ function getValueFromPresetVariable(
 	if ( presetObject ) {
 		const { key } = presetData;
 		const result = presetObject[ key ];
-		return getValueFromVariable( features, blockName, result ) || result;
+		return getValueFromVariable( styles, blockName, result ) || result;
 	}
 }
 
-function getValueFromCustomVariable( features, blockName, path ) {
+function getValueFromCustomVariable( styles, blockName, path ) {
 	const result =
-		get( features, [ blockName, 'custom', ...path ] ) ??
-		get( features, [ GLOBAL_CONTEXT, 'custom', ...path ] );
+		get( styles, [ blockName, 'settings', 'custom', ...path ] ) ??
+		get( styles, [ GLOBAL_CONTEXT, 'settings', 'custom', ...path ] );
 	// A variable may reference another variable so we need recursion until we find the value.
-	return getValueFromVariable( features, blockName, result ) || result;
+	return getValueFromVariable( styles, blockName, result ) || result;
 }
 
-export function getValueFromVariable( features, blockName, variable ) {
+export function getValueFromVariable( styles, blockName, variable ) {
 	if ( ! variable || ! isString( variable ) ) {
 		return;
 	}
@@ -126,9 +142,9 @@ export function getValueFromVariable( features, blockName, variable ) {
 
 	const [ type, ...path ] = parsedVar;
 	if ( type === 'preset' ) {
-		return getValueFromPresetVariable( features, blockName, path );
+		return getValueFromPresetVariable( styles, blockName, path );
 	}
 	if ( type === 'custom' ) {
-		return getValueFromCustomVariable( features, blockName, path );
+		return getValueFromCustomVariable( styles, blockName, path );
 	}
 }

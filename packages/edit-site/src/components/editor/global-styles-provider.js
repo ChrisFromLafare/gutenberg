@@ -21,6 +21,7 @@ import { useSelect, useDispatch } from '@wordpress/data';
  * Internal dependencies
  */
 import { default as getGlobalStyles } from './global-styles-renderer';
+import { getValueFromVariable, getPresetVariable } from './utils';
 
 const EMPTY_CONTENT = '{}';
 
@@ -95,22 +96,50 @@ export default function GlobalStylesProvider( {
 				set( contextSettings, path, newValue );
 				setContent( JSON.stringify( newContent ) );
 			},
-			getStyleProperty: ( context, propertyName, origin = 'merged' ) => {
+			getStyleProperty: (
+				context,
+				propertyName,
+				origin = 'merged',
+				resolveVars = true
+			) => {
 				const styles = 'user' === origin ? userStyles : mergedStyles;
 
-				return get(
+				const value = get(
 					styles?.[ context ]?.styles,
 					STYLE_PROPERTY[ propertyName ]
 				);
+				if ( resolveVars ) {
+					return (
+						getValueFromVariable( mergedStyles, context, value ) ||
+						value
+					);
+				}
+				return value;
 			},
-			setStyleProperty: ( context, propertyName, newValue ) => {
+			setStyleProperty: (
+				context,
+				propertyName,
+				newValue,
+				useVars = true
+			) => {
 				const newContent = { ...userStyles };
 				let contextStyles = newContent?.[ context ]?.styles;
 				if ( ! contextStyles ) {
 					contextStyles = {};
 					set( newContent, [ context, 'styles' ], contextStyles );
 				}
-				set( contextStyles, STYLE_PROPERTY[ propertyName ], newValue );
+				set(
+					contextStyles,
+					STYLE_PROPERTY[ propertyName ],
+					useVars
+						? getPresetVariable(
+								mergedStyles,
+								context,
+								propertyName,
+								newValue
+						  ) || newValue
+						: newValue
+				);
 				setContent( JSON.stringify( newContent ) );
 			},
 		} ),
