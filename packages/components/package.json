@@ -61,7 +61,6 @@
 		"uuid": "^8.3.0"
 	},
 	"peerDependencies": {
-		"@wordpress/blocks": "^6.24.1",
 		"@wordpress/hooks": "^2.10.0",
 		"@wordpress/i18n": "^3.16.0",
 		"@wordpress/rich-text": "^3.23.0"
